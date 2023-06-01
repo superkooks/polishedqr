@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -104,7 +103,6 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 
 	// Generate error correction
 	allwords := generateErrorWords(codewords, version, opts.ErrorCorrectionLevel)
-	fmt.Println(allwords)
 
 	// Create image
 	i := image.NewRGBA(image.Rect(0, 0, 17+version*4, 17+version*4))
@@ -114,10 +112,13 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 		i.SetRGBA(x, y, BLUE)
 	})
 
-	// Draw timing patterns in three corners
+	// Draw finder patterns in three corners
 	drawFinderPattern(i, 0, 0)
 	drawFinderPattern(i, 0, i.Rect.Dy()-7)
 	drawFinderPattern(i, i.Rect.Dx()-7, 0)
+
+	// Place temporary format bits
+	drawTempFormatBits(i)
 
 	// Draw both timing patterns
 	drawTimingPatterns(i)
@@ -137,9 +138,9 @@ func main() {
 		panic(err)
 	}
 
-	err = png.Encode(f, CreateQRCode([]byte("01234567"), &CreateOptions{
+	err = png.Encode(f, CreateQRCode([]byte("Hello, world! 123"), &CreateOptions{
 		Version:              1,
-		ErrorCorrectionLevel: "M",
+		ErrorCorrectionLevel: "L",
 	}))
 	if err != nil {
 		panic(err)

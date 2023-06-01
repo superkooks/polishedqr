@@ -57,6 +57,26 @@ func drawAlignmentPattern(i *image.RGBA, x0, y0 int) {
 	i.SetRGBA(x0+2, y0+2, BLACK)
 }
 
+func drawTempFormatBits(i *image.RGBA) {
+	iterateRect(9, 1, func(x, y int) {
+		i.SetRGBA(x, 8, WHITE)
+	})
+
+	iterateRect(1, 8, func(x, y int) {
+		i.SetRGBA(8, y, WHITE)
+	})
+
+	iterateRect(9, 1, func(x, y int) {
+		i.SetRGBA(i.Rect.Dx()-x, 8, WHITE)
+	})
+
+	iterateRect(1, 8, func(x, y int) {
+		i.SetRGBA(8, i.Rect.Dy()-y, WHITE)
+	})
+
+	i.SetRGBA(8, i.Rect.Dy()-8, BLACK)
+}
+
 func quietZone(i *image.RGBA) *image.RGBA {
 	n := image.NewRGBA(image.Rect(0, 0, i.Rect.Dx()+8, i.Rect.Dy()+8))
 	iterateRect(n.Rect.Dx(), n.Rect.Dy(), func(x, y int) {
