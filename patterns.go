@@ -2,6 +2,7 @@ package main
 
 import (
 	"image"
+	"image/color"
 	"image/draw"
 )
 
@@ -86,4 +87,76 @@ func quietZone(i *image.RGBA) *image.RGBA {
 	draw.Draw(n, image.Rect(4, 4, i.Rect.Dx()+4, i.Rect.Dy()+4), i, image.Pt(0, 0), draw.Over)
 
 	return n
+}
+
+func writeData(img *image.RGBA, data []uint8) {
+	// Convert data into a series of colors
+	var colors []color.RGBA
+	for _, v := range data {
+		for i := 7; i >= 0; i-- {
+			if v&(1<<i) > 0 {
+				colors = append(colors, BLACK)
+			} else {
+				colors = append(colors, WHITE)
+			}
+		}
+	}
+
+	// Draw in a zig zag pat
+	direction := 1
+	currentBit := 0
+	for x := img.Rect.Dx() - 1; x >= 0; x -= 2 {
+		if x == 6 {
+			// Skip the vertical timing pattern
+			x--
+		}
+
+		if direction == 1 {
+			// Upwards
+			for y := img.Rect.Dy() - 1; y >= 0; y-- {
+				// Right module
+				if img.RGBAAt(x, y) == BLUE {
+					img.SetRGBA(x, y, colors[currentBit])
+					currentBit++
+				}
+				if currentBit >= len(colors) {
+					colors = append(colors, WHITE)
+				}
+
+				// Left module
+				if img.RGBAAt(x-1, y) == BLUE {
+					img.SetRGBA(x-1, y, colors[currentBit])
+					currentBit++
+				}
+				if currentBit >= len(colors) {
+					colors = append(colors, WHITE)
+				}
+			}
+
+			direction = 0
+		} else {
+			// Downwards
+			for y := 0; y < img.Rect.Dy(); y++ {
+				// Right module
+				if img.RGBAAt(x, y) == BLUE {
+					img.SetRGBA(x, y, colors[currentBit])
+					currentBit++
+				}
+				if currentBit >= len(colors) {
+					colors = append(colors, WHITE)
+				}
+
+				// Left module
+				if img.RGBAAt(x-1, y) == BLUE {
+					img.SetRGBA(x-1, y, colors[currentBit])
+					currentBit++
+				}
+				if currentBit >= len(colors) {
+					colors = append(colors, WHITE)
+				}
+			}
+
+			direction = 1
+		}
+	}
 }

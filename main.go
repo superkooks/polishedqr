@@ -126,6 +126,9 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 	// Draw alignment patterns
 	drawAlignmentPatterns(i)
 
+	// Draw the data onto the qr code with a zig-zag pattern
+	writeData(i, allwords)
+
 	// Place qr code in quiet zone
 	i = quietZone(i)
 
@@ -138,8 +141,8 @@ func main() {
 		panic(err)
 	}
 
-	err = png.Encode(f, CreateQRCode([]byte("Hello, world! 123"), &CreateOptions{
-		Version:              1,
+	err = png.Encode(f, CreateQRCode([]byte("Hello, world! 123Hello, world! 123Hello, world! 123Hello, world! 123"), &CreateOptions{
+		Version:              4,
 		ErrorCorrectionLevel: "L",
 	}))
 	if err != nil {
