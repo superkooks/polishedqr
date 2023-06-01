@@ -94,14 +94,6 @@ func pmod(x, b int) int {
 var gfExp = make([]int, 512)
 var gfLog = make([]int, 256)
 
-func gfAdd(x, y int) int {
-	return x ^ y
-}
-
-func gfSub(x, y int) int {
-	return x ^ y
-}
-
 // Uses Russian Peasant Multiplication. Buggered if I know.
 func gfMul(x int, y int, prim int, fieldCharacFull int, carryless bool) int {
 	r := 0
@@ -240,6 +232,71 @@ func initGFTables() bool {
 	}
 
 	return true
+}
+
+func hammingWeight(x int) int {
+	var weight int
+	for x > 0 {
+		weight += x & 1
+		x >>= 1
+	}
+	return weight
+}
+
+func checkFormat(fmt int) int {
+	g := 0b10100110111
+	for i := 4; i >= 0; i-- {
+		if fmt&(1<<(i+10)) != 0 {
+			fmt ^= g << i
+		}
+	}
+
+	return fmt
+}
+
+func checkVersion(fmt int) int {
+	g := 0b1111100100101
+	for i := 4; i >= 0; i-- {
+		if fmt&(1<<(i+12)) != 0 {
+			fmt ^= g << i
+		}
+	}
+
+	return fmt
+}
+
+func decodeFormat(fmt int) int {
+	bestFmt := -1
+	bestDist := 15
+	for testFmt := 0; testFmt < 32; testFmt++ {
+		testCode := (testFmt << 10) ^ checkFormat(testFmt<<10)
+		testDist := hammingWeight(fmt ^ testCode)
+		if testDist < bestDist {
+			bestDist = testDist
+			bestFmt = testFmt
+		} else if testDist == bestDist {
+			bestFmt = -1
+		}
+	}
+
+	return bestFmt
+}
+
+func decodeVersion(fmt int) int {
+	bestFmt := -1
+	bestDist := 15
+	for testFmt := 0; testFmt < 32*4; testFmt++ {
+		testCode := (testFmt << 12) ^ checkFormat(testFmt<<12)
+		testDist := hammingWeight(fmt ^ testCode)
+		if testDist < bestDist {
+			bestDist = testDist
+			bestFmt = testFmt
+		} else if testDist == bestDist {
+			bestFmt = -1
+		}
+	}
+
+	return bestFmt
 }
 
 // I love plagiarism

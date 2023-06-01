@@ -89,15 +89,86 @@ func quietZone(i *image.RGBA) *image.RGBA {
 	return n
 }
 
+func addFormatAndVersionInfo(img *image.RGBA, ecLevel string, maskPattern int, version int) {
+	// Generate 15 bits of format info
+	var ecNum int
+	switch ecLevel {
+	case "L":
+		ecNum = 1
+	case "M":
+		ecNum = 0
+	case "Q":
+		ecNum = 3
+	case "H":
+		ecNum = 2
+	default:
+		panic("invalid error correction level")
+	}
+
+	if maskPattern > 7 || maskPattern < 0 {
+		panic("invalid mask pattern")
+	}
+
+	code := ecNum<<3 | maskPattern
+	encodedFormat := ((code << 10) | checkFormat(code<<10))
+	maskedFormat := 0b101010000010010 ^ encodedFormat
+
+	// Convert into colors
+	var colors []color.RGBA
+	for i := 0; i < 15; i++ {
+		if maskedFormat&(1<<i) > 0 {
+			colors = append(colors, BLACK)
+		} else {
+			colors = append(colors, WHITE)
+		}
+	}
+
+	// Write format info (top left)
+	img.SetRGBA(8, 0, colors[0])
+	img.SetRGBA(8, 1, colors[1])
+	img.SetRGBA(8, 2, colors[2])
+	img.SetRGBA(8, 3, colors[3])
+	img.SetRGBA(8, 4, colors[4])
+	img.SetRGBA(8, 5, colors[5])
+	img.SetRGBA(8, 7, colors[6])
+	img.SetRGBA(8, 8, colors[7])
+	img.SetRGBA(7, 8, colors[8])
+	img.SetRGBA(5, 8, colors[9])
+	img.SetRGBA(4, 8, colors[10])
+	img.SetRGBA(3, 8, colors[11])
+	img.SetRGBA(2, 8, colors[12])
+	img.SetRGBA(1, 8, colors[13])
+	img.SetRGBA(0, 8, colors[14])
+
+	// Write format info (top right)
+	img.SetRGBA(img.Rect.Dx()-1, 8, colors[0])
+	img.SetRGBA(img.Rect.Dx()-2, 8, colors[1])
+	img.SetRGBA(img.Rect.Dx()-3, 8, colors[2])
+	img.SetRGBA(img.Rect.Dx()-4, 8, colors[3])
+	img.SetRGBA(img.Rect.Dx()-5, 8, colors[4])
+	img.SetRGBA(img.Rect.Dx()-6, 8, colors[5])
+	img.SetRGBA(img.Rect.Dx()-7, 8, colors[6])
+	img.SetRGBA(img.Rect.Dx()-8, 8, colors[7])
+
+	// Write format info (bottom left)
+	img.SetRGBA(8, img.Rect.Dy()-7, colors[8])
+	img.SetRGBA(8, img.Rect.Dy()-6, colors[9])
+	img.SetRGBA(8, img.Rect.Dy()-5, colors[10])
+	img.SetRGBA(8, img.Rect.Dy()-4, colors[11])
+	img.SetRGBA(8, img.Rect.Dy()-3, colors[12])
+	img.SetRGBA(8, img.Rect.Dy()-2, colors[13])
+	img.SetRGBA(8, img.Rect.Dy()-1, colors[14])
+}
+
 func writeData(img *image.RGBA, data []uint8) {
 	// Convert data into a series of colors
 	var colors []color.RGBA
 	for _, v := range data {
 		for i := 7; i >= 0; i-- {
 			if v&(1<<i) > 0 {
-				colors = append(colors, BLACK)
+				colors = append(colors, GREEN)
 			} else {
-				colors = append(colors, WHITE)
+				colors = append(colors, RED)
 			}
 		}
 	}
@@ -120,7 +191,7 @@ func writeData(img *image.RGBA, data []uint8) {
 					currentBit++
 				}
 				if currentBit >= len(colors) {
-					colors = append(colors, WHITE)
+					colors = append(colors, RED)
 				}
 
 				// Left module
@@ -129,7 +200,7 @@ func writeData(img *image.RGBA, data []uint8) {
 					currentBit++
 				}
 				if currentBit >= len(colors) {
-					colors = append(colors, WHITE)
+					colors = append(colors, RED)
 				}
 			}
 
@@ -143,7 +214,7 @@ func writeData(img *image.RGBA, data []uint8) {
 					currentBit++
 				}
 				if currentBit >= len(colors) {
-					colors = append(colors, WHITE)
+					colors = append(colors, RED)
 				}
 
 				// Left module
@@ -152,7 +223,7 @@ func writeData(img *image.RGBA, data []uint8) {
 					currentBit++
 				}
 				if currentBit >= len(colors) {
-					colors = append(colors, WHITE)
+					colors = append(colors, RED)
 				}
 			}
 
