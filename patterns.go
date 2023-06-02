@@ -78,6 +78,16 @@ func drawTempFormatBits(i *image.RGBA) {
 	i.SetRGBA(8, i.Rect.Dy()-8, BLACK)
 }
 
+func drawTempVersionBits(i *image.RGBA) {
+	iterateRect(3, 6, func(x, y int) {
+		i.SetRGBA(i.Rect.Dx()-9-x, y, WHITE)
+	})
+
+	iterateRect(6, 3, func(x, y int) {
+		i.SetRGBA(x, i.Rect.Dy()-9-y, WHITE)
+	})
+}
+
 func quietZone(i *image.RGBA) *image.RGBA {
 	n := image.NewRGBA(image.Rect(0, 0, i.Rect.Dx()+8, i.Rect.Dy()+8))
 	iterateRect(n.Rect.Dx(), n.Rect.Dy(), func(x, y int) {
@@ -158,6 +168,39 @@ func addFormatAndVersionInfo(img *image.RGBA, ecLevel string, maskPattern int, v
 	img.SetRGBA(8, img.Rect.Dy()-3, colors[12])
 	img.SetRGBA(8, img.Rect.Dy()-2, colors[13])
 	img.SetRGBA(8, img.Rect.Dy()-1, colors[14])
+
+	// Add version info
+	if version >= 7 {
+		encodedVersion := ((version << 12) | checkVersion(version<<12))
+
+		// Convert to colors
+		var colors []color.RGBA
+		for i := 0; i < 18; i++ {
+			if encodedVersion&(1<<i) > 0 {
+				colors = append(colors, BLACK)
+			} else {
+				colors = append(colors, WHITE)
+			}
+		}
+
+		// Write version info (top right)
+		var i int
+		for y := 0; y < 6; y++ {
+			for x := img.Rect.Dx() - 11; x < img.Rect.Dx()-8; x++ {
+				img.SetRGBA(x, y, colors[i])
+				i++
+			}
+		}
+
+		// Write version info (bottom left)
+		i = 0
+		for x := 0; x < 6; x++ {
+			for y := img.Rect.Dy() - 11; y < img.Rect.Dy()-8; y++ {
+				img.SetRGBA(x, y, colors[i])
+				i++
+			}
+		}
+	}
 }
 
 func writeData(img *image.RGBA, data []uint8) {

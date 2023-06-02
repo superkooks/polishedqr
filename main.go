@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"os"
@@ -52,19 +53,51 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 		version = opts.Version
 	}
 
-	// Encode data
 	var dataBits Bits
-	switch mode {
-	case Numeric:
-		dataBits = ConvertToNumeric(data, version)
-	case Alphanumeric:
-		dataBits = ConvertToAlphanumeric(data, version)
-	case Bytes:
-		dataBits = ConvertToBytes(data, version)
+	var totalDatawords int
+	for {
+		// Encode data
+		switch mode {
+		case Numeric:
+			dataBits = ConvertToNumeric(data, version)
+		case Alphanumeric:
+			dataBits = ConvertToAlphanumeric(data, version)
+		case Bytes:
+			dataBits = ConvertToBytes(data, version)
+		default:
+			panic("unsupported encoding mode")
+		}
+
+		// Get total data size of this symbol
+		totalDatawords = 0
+		blocks := codeWordTable[version][opts.ErrorCorrectionLevel]
+		for _, v := range blocks.blocks {
+			totalDatawords += v.dataWords * v.count
+		}
+
+		// Check whether the data fits
+		fmt.Println(len(dataBits), totalDatawords, version)
+		if len(dataBits) > totalDatawords*8 {
+			if version != opts.Version {
+				// Version is unset in options, try a larger symbol size
+				if version == 40 {
+					panic("data cannot fit in largest qr code")
+				}
+
+				version++
+				continue
+			} else {
+				panic("data cannot fit in designated size qr code")
+			}
+		}
+
+		break
 	}
 
-	// Add terminator
-	dataBits = append(dataBits, Bits{0, 0, 0, 0}...)
+	// Add terminator (if required)
+	for i := 0; i < 4 && len(dataBits) < totalDatawords*8; i++ {
+		dataBits = append(dataBits, 0)
+	}
 
 	// Pad to nearest 8 bits
 	for i := 0; i < len(dataBits)%8; i++ {
@@ -87,12 +120,6 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 	}
 
 	// Add padding codewords
-	var totalDatawords int
-	blocks := codeWordTable[version][opts.ErrorCorrectionLevel]
-	for _, v := range blocks.blocks {
-		totalDatawords += v.dataWords * v.count
-	}
-
 	for i := 0; len(codewords) < totalDatawords; i++ {
 		if i%2 == 0 {
 			codewords = append(codewords, 0b11101100)
@@ -119,6 +146,9 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 
 	// Place temporary format bits
 	drawTempFormatBits(i)
+	if version >= 7 {
+		drawTempVersionBits(i)
+	}
 
 	// Draw both timing patterns
 	drawTimingPatterns(i)
@@ -130,8 +160,8 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 	writeData(i, allwords)
 
 	// Apply the best mask
-	pattern := applyBestMask(i, opts.ErrorCorrectionLevel, opts.Version)
-	addFormatAndVersionInfo(i, opts.ErrorCorrectionLevel, pattern, opts.Version)
+	pattern := applyBestMask(i, opts.ErrorCorrectionLevel, version)
+	addFormatAndVersionInfo(i, opts.ErrorCorrectionLevel, pattern, version)
 
 	// Place qr code in quiet zone
 	i = quietZone(i)
@@ -145,8 +175,7 @@ func main() {
 		panic(err)
 	}
 
-	err = png.Encode(f, CreateQRCode([]byte("Hello, world! 123"), &CreateOptions{
-		Version:              1,
+	err = png.Encode(f, CreateQRCode([]byte("00000.UFF7THUFF7000001F8F7THUFF7UF00000000UFF7UFF7F7UFF7UF00000000UFF7UEUFF7T*000005F7UFF7UEUFF7UFF500000001F7T*00000.UFF7UF7QF7SK000.QOM:UPUFF7UFEA0000001+F7UFF7THUFF7UFEA0000001+F7UEUFF7UE0000003ZUFF7UF7QF7UFF7SK000000F7UF"), &CreateOptions{
 		ErrorCorrectionLevel: "L",
 	}))
 	if err != nil {

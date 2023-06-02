@@ -5,9 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
-	"image/png"
 	"math"
-	"os"
 )
 
 var Masks = []func(int, int) bool{mask1, mask2, mask3, mask4, mask5, mask6, mask7, mask8}
@@ -235,10 +233,6 @@ func determinePenalty(masked *image.RGBA) int {
 		dev := ratio - 0.5
 		penalty += (int(dev*100)/5 - 1) * 10
 	}
-
-	f, _ := os.Create("masked.png")
-	png.Encode(f, masked)
-	f.Close()
 
 	return penalty
 }
