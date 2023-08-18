@@ -31,9 +31,7 @@ func AutodetectCharacterSet(data []byte) CharacterSet {
 
 type Bits []uint8
 
-func CharacterCount(count int, mode CharacterSet, version int) Bits {
-	var bitCapacity int
-
+func CharacterCountBitCapacity(mode CharacterSet, version int) (bitCapacity int) {
 	// Different versions and encodings have different numbers of bits
 	// in the character count
 	if version < 10 {
@@ -64,6 +62,12 @@ func CharacterCount(count int, mode CharacterSet, version int) Bits {
 			bitCapacity = 16
 		}
 	}
+
+	return
+}
+
+func CharacterCount(count int, mode CharacterSet, version int) Bits {
+	bitCapacity := CharacterCountBitCapacity(mode, version)
 
 	var out Bits
 	for i := bitCapacity - 1; i >= 0; i-- {
@@ -226,3 +230,5 @@ var alphanumericTable = map[byte]int{
 	'/': 43,
 	':': 44,
 }
+
+var alphanumericTableReverse = reverseMap(alphanumericTable)

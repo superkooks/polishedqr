@@ -4,24 +4,33 @@ import "image"
 
 func drawAlignmentPatterns(i *image.RGBA) {
 	version := (i.Rect.Dx()-21)/4 + 1
+	for _, v := range getAlignmentPositions(version) {
+		drawAlignmentPattern(i, v[0]-2, v[1]-2)
+	}
+}
 
+// Returns the centre coordinates of the alignment patterns for a version
+func getAlignmentPositions(version int) (out [][2]int) {
 	ordinates := alignmentTable[version]
+	sideLength := 4*version + 17
 
 	for _, x := range ordinates {
 		for _, y := range ordinates {
-			if x == 6 && y > i.Rect.Dy()-10 {
+			if x == 6 && y > sideLength-10 {
 				continue
 			}
-			if y == 6 && x > i.Rect.Dx()-10 {
+			if y == 6 && x > sideLength-10 {
 				continue
 			}
 			if x == 6 && y == 6 {
 				continue
 			}
 
-			drawAlignmentPattern(i, x-2, y-2)
+			out = append(out, [2]int{x, y})
 		}
 	}
+
+	return
 }
 
 var alignmentTable = map[int][]int{
