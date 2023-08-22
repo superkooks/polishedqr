@@ -13,7 +13,7 @@ func main() {
 	// 	panic(err)
 	// }
 
-	// f, err := os.Open("image7.png")
+	// f, err := os.Open("image10.png")
 	// if err != nil {
 	// 	panic(err)
 	// }

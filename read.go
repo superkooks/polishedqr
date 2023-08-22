@@ -71,6 +71,7 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 
 	// Find nested contours that roughly have areas in the ratio of a finder pattern
 	var finderPatterns []gocv.RotatedRect
+	var alignmentPatterns []gocv.RotatedRect
 	for i := 0; i < contours.Size(); i++ {
 		// Get first child contour
 		child := int(hierarchy.GetVeciAt(0, i)[2])
@@ -79,33 +80,41 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 		}
 
 		for {
-			// Get first child contour of child countour
-			child2 := int(hierarchy.GetVeciAt(0, child)[2])
-			if child2 < 0 {
-				break
+			// Detect alignment pattern
+			area1 := gocv.ContourArea(contours.At(i))
+			area2 := gocv.ContourArea(contours.At(child))
+			if area2/area1 < 1.0/3.0/3.0+0.05 && area2/area1 > 1.0/3.0/3.0-0.05 {
+				// Alignment pattern has good ratio of areas
+				pattern := gocv.MinAreaRect(contours.At(i))
+				alignmentPatterns = append(alignmentPatterns, pattern)
+				gocv.Circle(&img, pattern.Center, 1, color.RGBA{0, 255, 0, 255}, 3)
 			}
 
-			for {
-				area1 := gocv.ContourArea(contours.At(i))
-				area2 := gocv.ContourArea(contours.At(child))
-				area3 := gocv.ContourArea(contours.At(child2))
+			// Get first child contour of child countour
+			child2 := int(hierarchy.GetVeciAt(0, child)[2])
+			if child2 > 0 {
+				for {
+					area1 := gocv.ContourArea(contours.At(i))
+					area2 := gocv.ContourArea(contours.At(child))
+					area3 := gocv.ContourArea(contours.At(child2))
 
-				if area3/area1 < 3.0*3.0/7.0/7.0+0.05 && area3/area1 > 3.0*3.0/7.0/7.0-0.05 &&
-					area2/area1 < 5.0*5.0/7.0/7.0+0.15 && area2/area1 > 5.0*5.0/7.0/7.0-0.15 {
-					// Finder pattern has good ratio of areas
-					gocv.DrawContours(&img, contours, i, color.RGBA{255, 0, 0, 255}, 1)
-					gocv.DrawContours(&img, contours, child, color.RGBA{255, 0, 0, 255}, 1)
-					gocv.DrawContours(&img, contours, child2, color.RGBA{255, 0, 0, 255}, 1)
+					if area3/area1 < 3.0*3.0/7.0/7.0+0.05 && area3/area1 > 3.0*3.0/7.0/7.0-0.05 &&
+						area2/area1 < 5.0*5.0/7.0/7.0+0.15 && area2/area1 > 5.0*5.0/7.0/7.0-0.15 {
+						// Finder pattern has good ratio of areas
+						gocv.DrawContours(&img, contours, i, color.RGBA{255, 0, 0, 255}, 1)
+						gocv.DrawContours(&img, contours, child, color.RGBA{255, 0, 0, 255}, 1)
+						gocv.DrawContours(&img, contours, child2, color.RGBA{255, 0, 0, 255}, 1)
 
-					pattern := gocv.MinAreaRect(contours.At(i))
-					finderPatterns = append(finderPatterns, pattern)
-					gocv.Circle(&img, pattern.Center, 1, color.RGBA{0, 255, 0, 255}, 3)
-				}
+						pattern := gocv.MinAreaRect(contours.At(i))
+						finderPatterns = append(finderPatterns, pattern)
+						gocv.Circle(&img, pattern.Center, 1, color.RGBA{0, 255, 0, 255}, 3)
+					}
 
-				// Get sibling at previous heirarchy level
-				child2 = int(hierarchy.GetVeciAt(0, child2)[0])
-				if child2 < 0 {
-					break
+					// Get sibling at previous heirarchy level
+					child2 = int(hierarchy.GetVeciAt(0, child2)[0])
+					if child2 < 0 {
+						break
+					}
 				}
 			}
 
@@ -217,31 +226,82 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 		}
 	}
 
-	// Find the alignment patterns for versions > 1
+	// Sample into image
+	i := image.NewRGBA(image.Rect(0, 0, version*4+17, version*4+17))
 	if version > 1 {
-		modSize := float64(topLeft.Width) / 7
+		// Find the bottom-rightmost alignment pattern for versions > 1
+		modSizeX := vecLen(topRight.Center.Sub(topLeft.Center)) / float64(version*4+10)
+		modSizeY := vecLen(bottomLeft.Center.Sub(topLeft.Center)) / float64(version*4+10)
 
 		// Find the unit module vector in the direction of +X
 		l1 := topRight.Center.Sub(topLeft.Center)
-		x1 := float64(l1.X) / vecLen(l1) * modSize
-		y1 := float64(l1.Y) / vecLen(l1) * modSize
+		x1 := float64(l1.X) / vecLen(l1) * modSizeX
+		y1 := float64(l1.Y) / vecLen(l1) * modSizeY
 
 		// Find the unit module vector in the direction of +Y
 		l2 := bottomLeft.Center.Sub(topLeft.Center)
-		x2 := float64(l2.X) / vecLen(l2) * modSize
-		y2 := float64(l2.Y) / vecLen(l2) * modSize
+		x2 := float64(l2.X) / vecLen(l2) * modSizeX
+		y2 := float64(l2.Y) / vecLen(l2) * modSizeY
 
-		// The most top left module
+		// Get the top-leftmost module
 		pointA := topLeft.Center.Sub(image.Pt(int(x1*3+x2*3), int(y1*3+y2*3)))
 		gocv.Circle(&img, pointA, 0, color.RGBA{255, 0, 0, 255}, 1)
 
-		alignments := getAlignmentPositions(version)
-		_ = alignments
-	}
+		// Get the provisional position of the alignment pattern
+		standardAligns := getAlignmentPositions(version)
+		bottomStandardAlign := standardAligns[len(standardAligns)-1]
 
-	// Sample into image
-	i := image.NewRGBA(image.Rect(0, 0, version*4+17, version*4+17))
-	{
+		provisional := pointA.Add(image.Pt(int(x1*float64(bottomStandardAlign[0])+x2*float64(bottomStandardAlign[1])), int(y1*float64(bottomStandardAlign[0])+y2*float64(bottomStandardAlign[1]))))
+
+		// Find closest alignment pattern to provisional centre
+		var minPattern gocv.RotatedRect
+		minDist := math.MaxFloat64
+		for _, v := range alignmentPatterns {
+			diff := provisional.Sub(v.Center)
+			dist := math.Sqrt(math.Pow(float64(diff.X)/(x1+x2)/2, 2) + math.Pow(float64(diff.Y)/(y1+y2)/2, 2))
+			if dist < minDist {
+				minDist = dist
+				minPattern = v
+			}
+		}
+		gocv.Circle(&img, minPattern.Center, 1, color.RGBA{255, 0, 0, 255}, 3)
+
+		// Generate a perspective transform from the 4 points
+		src := gocv.NewPointVectorFromPoints([]image.Point{
+			topLeft.Center, topRight.Center, bottomLeft.Center, minPattern.Center,
+		})
+		dst := gocv.NewPointVectorFromPoints([]image.Point{
+			{35, 35},
+			{version*40 + 135, 35},
+			{35, version*40 + 135},
+			{bottomStandardAlign[0]*10 + 5, bottomStandardAlign[1]*10 + 5},
+		})
+		transform := gocv.GetPerspectiveTransform(src, dst)
+
+		// Warp the image with matrix
+		warped := gocv.NewMat()
+		gocv.WarpPerspective(thresheld, &warped, transform, image.Pt(version*40+170, version*40+170))
+
+		warpedColor := gocv.NewMat()
+		gocv.CvtColor(warped, &warpedColor, gocv.ColorGrayToBGR)
+
+		for x := 0.0; x < float64(i.Rect.Dx()); x++ {
+			for y := 0.0; y < float64(i.Rect.Dy()); y++ {
+				pt := image.Pt(int(10*x+5), int(10*y+5))
+				gocv.Circle(&warpedColor, pt, 0, color.RGBA{255, 0, 0, 255}, 1)
+
+				if warped.GetUCharAt(pt.Y, pt.X) == 0 {
+					i.SetRGBA(int(x), int(y), BLACK)
+				} else {
+					i.SetRGBA(int(x), int(y), WHITE)
+				}
+
+			}
+		}
+
+		windowSegmented.IMShow(warpedColor)
+
+	} else {
 		modSizeX := vecLen(topRight.Center.Sub(topLeft.Center)) / float64(version*4+10)
 		modSizeY := vecLen(bottomLeft.Center.Sub(topLeft.Center)) / float64(version*4+10)
 
@@ -274,8 +334,6 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 			}
 		}
 	}
-
-	windowSegmented.IMShow(img)
 
 	// Get format info
 	var ecLevel string
@@ -601,7 +659,7 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 		windowSegmented.IMShow(img)
 	}
 
-	fmt.Println("decoded data", string(decodedData))
+	fmt.Println("decoded data:", string(decodedData))
 
 	return QRCodeResult{
 		ErrorCorrectionLevel: ecLevel,
