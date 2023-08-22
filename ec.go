@@ -73,7 +73,7 @@ func correctDataWords(allWords []uint8, version int, ecLevel string) ([]uint8, e
 			if len(v.dataWords) < v.dataCount {
 				v.dataWords = append(v.dataWords, allWords[i])
 				i++
-			} else if len(v.errorWords) < v.ecCount {
+			} else if len(v.errorWords) < v.ecCount && len(blocks[len(blocks)-1].dataWords) == blocks[len(blocks)-1].dataCount {
 				v.errorWords = append(v.errorWords, allWords[i])
 				i++
 			} else if k == len(blocks)-1 {

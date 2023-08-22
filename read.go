@@ -99,7 +99,7 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 					area3 := gocv.ContourArea(contours.At(child2))
 
 					if area3/area1 < 3.0*3.0/7.0/7.0+0.05 && area3/area1 > 3.0*3.0/7.0/7.0-0.05 &&
-						area2/area1 < 5.0*5.0/7.0/7.0+0.15 && area2/area1 > 5.0*5.0/7.0/7.0-0.15 {
+						area2/area1 < 5.0*5.0/7.0/7.0+0.05 && area2/area1 > 5.0*5.0/7.0/7.0-0.05 {
 						// Finder pattern has good ratio of areas
 						gocv.DrawContours(&img, contours, i, color.RGBA{255, 0, 0, 255}, 1)
 						gocv.DrawContours(&img, contours, child, color.RGBA{255, 0, 0, 255}, 1)
@@ -219,7 +219,7 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 		}
 
 		version = decodeVersion(versionBits)
-		if version < 0 {
+		if version < 1 {
 			// Technically we could go read the second version information block.
 			// But, I am lazy.
 			return QRCodeResult{}, errors.New("unable to decode version information")
@@ -637,6 +637,31 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 			var byt byte
 			for j := 0; j < 8; j++ {
 				if bits[4+charBits+i*8+j] > 0 {
+					byt |= 1 << (7 - j)
+				}
+			}
+
+			decodedData = append(decodedData, byt)
+		}
+
+	} else if bytes.Equal(bits[:4], Bits{0, 1, 1, 1}) {
+		// ECI Mode (returns bytes)
+		charset = Bytes
+		charBits := CharacterCountBitCapacity(Bytes, version)
+
+		// Get character count
+		var charCount int
+		for k, v := range bits[16 : 16+charBits] {
+			if v > 0 {
+				charCount |= 1 << (charBits - 1 - k)
+			}
+		}
+
+		// Convert bits to bytes
+		for i := 0; i < charCount; i++ {
+			var byt byte
+			for j := 0; j < 8; j++ {
+				if bits[16+charBits+i*8+j] > 0 {
 					byt |= 1 << (7 - j)
 				}
 			}
