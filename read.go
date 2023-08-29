@@ -1,4 +1,4 @@
-package main
+package polishedqr
 
 import (
 	"bytes"
@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"math"
-	"os"
 
 	"gocv.io/x/gocv"
 )
@@ -22,8 +20,12 @@ type QRCodeResult struct {
 	Data                 []byte
 }
 
-func ReadFromWebcam(displayIntermediates bool) {
-	webcam, _ := gocv.VideoCaptureDevice(0)
+func ReadFromWebcam(displayIntermediates bool) (QRCodeResult, error) {
+	webcam, err := gocv.VideoCaptureDevice(0)
+	if err != nil {
+		return QRCodeResult{}, fmt.Errorf("failed to open camera: %v", err)
+	}
+
 	webcam.Set(gocv.VideoCaptureFPS, 30)
 	window := gocv.NewWindow("Original")
 	img := gocv.NewMat()
@@ -35,27 +37,29 @@ func ReadFromWebcam(displayIntermediates bool) {
 	for {
 		webcam.Read(&img)
 		window.IMShow(img)
-		readQRCode(img, displayIntermediates)
+		result, err := readQRCode(img, displayIntermediates)
+		if err == nil {
+			return result, nil
+		}
+
 		window.WaitKey(1)
 	}
 }
 
-func ReadFromImage(img *image.RGBA) {
+func ReadFromImage(img *image.RGBA) (QRCodeResult, error) {
 	mat, err := gocv.ImageToMatRGB(img)
 	if err != nil {
 		panic(err)
 	}
-	windowSegmented = gocv.NewWindow("Segmented")
-	_, err = readQRCode(mat, true)
-	if err != nil {
-		fmt.Println(err)
-	}
-	for {
-		windowSegmented.WaitKey(1)
-	}
+	return readQRCode(mat, false)
 }
 
 func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error) {
+	// Scale up image if it is too small
+	if img.Rows() < 200 || img.Cols() < 200 {
+		gocv.Resize(img, &img, image.Pt(0, 0), 10, 10, gocv.InterpolationNearestNeighbor)
+	}
+
 	// Convert into grayscale
 	grayscale := gocv.NewMat()
 	gocv.CvtColor(img, &grayscale, gocv.ColorRGBToGray)
@@ -131,7 +135,9 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 			gocv.DrawContours(&img, contours, i, color.RGBA{255, 0, 0, 255}, 2)
 		}
 
-		windowSegmented.IMShow(img)
+		if useWindows {
+			windowSegmented.IMShow(img)
+		}
 		return QRCodeResult{}, fmt.Errorf("could not find qr code (only %v finder patterns)", len(finderPatterns))
 	}
 
@@ -299,7 +305,9 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 			}
 		}
 
-		windowSegmented.IMShow(warpedColor)
+		if useWindows {
+			windowSegmented.IMShow(warpedColor)
+		}
 
 	} else {
 		modSizeX := vecLen(topRight.Center.Sub(topLeft.Center)) / float64(version*4+10)
@@ -383,9 +391,6 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 
 		maskPattern = formatBits & 0b111
 	}
-
-	f, _ := os.Create("test.png")
-	png.Encode(f, i)
 
 	// Mask off fixed patterns
 	{
@@ -673,18 +678,9 @@ func readQRCode(img gocv.Mat, useWindows bool) (decoded QRCodeResult, err error)
 		return QRCodeResult{}, errors.New("unknown character set")
 	}
 
-	fmt.Println(ecLevel, maskPattern)
-	fmt.Println("version", version)
-
 	if useWindows {
-		// mat, err := gocv.ImageToMatRGB()
-		// if err != nil {
-		// 	panic(err)
-		// }
 		windowSegmented.IMShow(img)
 	}
-
-	fmt.Println("decoded data:", string(decodedData))
 
 	return QRCodeResult{
 		ErrorCorrectionLevel: ecLevel,

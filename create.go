@@ -1,7 +1,6 @@
-package main
+package polishedqr
 
 import (
-	"fmt"
 	"image"
 )
 
@@ -74,7 +73,6 @@ func CreateQRCode(data []byte, opts *CreateOptions) *image.RGBA {
 		}
 
 		// Check whether the data fits
-		fmt.Println(len(dataBits), totalDatawords, version)
 		if len(dataBits) > totalDatawords*8 {
 			if version != opts.Version {
 				// Version is unset in options, try a larger symbol size

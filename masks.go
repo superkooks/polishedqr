@@ -1,7 +1,6 @@
-package main
+package polishedqr
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -51,7 +50,6 @@ func applyBestMask(img *image.RGBA, ecLevel string, version int) int {
 
 		// Determine penalty
 		p := determinePenalty(masked)
-		fmt.Println("mask pen", k, p)
 		if p < lowestPenalty {
 			lowestPenalty = p
 			bestMask = k

@@ -1,4 +1,4 @@
-package main
+package polishedqr
 
 type ecBlock struct {
 	count     int
