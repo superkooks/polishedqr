@@ -9,6 +9,7 @@ import (
 
 	"github.com/superkooks/polishedqr"
 	"github.com/urfave/cli/v2"
+	"gocv.io/x/gocv"
 
 	"image/draw"
 	_ "image/jpeg"
@@ -58,6 +59,12 @@ func main() {
 						DefaultText: "M",
 						Value:       "M",
 					},
+					&cli.Float64Flag{
+						Name:        "scale",
+						Usage:       "the factor to scale the output image by",
+						DefaultText: "1",
+						Value:       1,
+					},
 				},
 
 				Action: func(ctx *cli.Context) error {
@@ -87,6 +94,28 @@ func main() {
 						Version:              ctx.Int("version"),
 					}
 					img := polishedqr.CreateQRCode(b, opts)
+
+					if ctx.Float64("scale") != 1 {
+						mat, err := gocv.ImageToMatRGBA(img)
+						if err != nil {
+							panic(err)
+						}
+						gocv.Resize(mat, &mat, image.Pt(0, 0), ctx.Float64("scale"), ctx.Float64("scale"), gocv.InterpolationNearestNeighbor)
+
+						i, err := mat.ToImage()
+						if err != nil {
+							panic(err)
+						}
+
+						r := image.Rect(
+							0, 0,
+							int(float64(img.Rect.Dx())*ctx.Float64("scale")),
+							int(float64(img.Rect.Dy())*ctx.Float64("scale")),
+						)
+
+						img = image.NewRGBA(r)
+						draw.Draw(img, r, i, image.Pt(0, 0), draw.Over)
+					}
 
 					if ctx.Path("out") == "" {
 						PrintQRCodeASCII(img)
